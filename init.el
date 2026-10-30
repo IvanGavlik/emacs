@@ -16,6 +16,8 @@
 (unless package-archive-contents
   (package-refresh-contents))
 
+;; Built-in use-package (Emacs 29+) doesn't load :ensure support by default.
+(require 'use-package-ensure)
 (setq use-package-always-ensure t)
 
 (use-package clojure-mode)
