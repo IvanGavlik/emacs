@@ -1,0 +1,2 @@
+# Keep LF in the repo and in the working tree on every OS (Windows included)
+* text=auto eol=lf

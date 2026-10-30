@@ -1,0 +1,28 @@
+# Installed per machine
+elpa/
+eln-cache/
+straight/
+
+# Runtime state / caches
+auto-save-list/
+transient/
+url/
+tramp
+projects.eld
+recentf
+history
+savehist
+places
+bookmarks
+network-security.data
+*.elc
+*~
+\#*\#
+.#*
+
+# Machine-specific
+custom.el
+local.el
+
+# Emacs built-in tutorial copy
+tutorial/

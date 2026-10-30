@@ -1,0 +1,11 @@
+;;; local.el --- Per-machine settings (copy to local.el, which is gitignored)  -*- lexical-binding: t; -*-
+
+;; Extra tool locations not on Emacs' PATH
+;; (setq my/extra-exec-paths '("C:/Users/you/scoop/shims" "C:/Program Files/Git/usr/bin"))
+;; (setq my/extra-exec-paths '("/opt/tools/bin"))
+
+;; Font (differs per OS)
+;; (set-face-attribute 'default nil :family "Consolas" :height 110)            ; Windows
+;; (set-face-attribute 'default nil :family "DejaVu Sans Mono" :height 110)    ; Ubuntu
+
+;; Secrets / tokens go here, never in init.el.
