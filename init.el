@@ -80,8 +80,13 @@
 ;;; OS-specific settings
 
 (when my/windows-p
-  (setq default-directory "~/"
-        w32-use-native-image-API t
+  ;; "~" is %APPDATA% on Windows, so start in %USERPROFILE%\Projects instead.
+  (let ((projects (expand-file-name "Projects" (getenv "USERPROFILE"))))
+    (setq default-directory (file-name-as-directory
+                             (if (file-directory-p projects)
+                                 projects
+                               (getenv "USERPROFILE")))))
+  (setq w32-use-native-image-API t
         ;; Avoid slow process spawning / stalls with many subprocesses (CIDER, git)
         w32-pipe-read-delay 0
         process-adaptive-read-buffering nil
