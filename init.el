@@ -69,68 +69,6 @@
 (when my/linux-p
   (use-package eat))
 
-;;; Claude Code (print mode) with rendered Markdown answers
-;; M-x my/claude        ask; the answer is appended to *claude*, rendered as Markdown
-;; C-u M-x my/claude    continue the last conversation (claude -c)
-;; Active region        the selected text is sent to Claude as input (like piping)
-;; Runs in the folder of the current file / Dired / shell buffer; from any other
-;; buffer (*scratch*, *Messages*, *claude*, ...) it runs in `my/projects-dir'.
-
-(defun my/claude-directory ()
-  "Folder Claude should run in for the current buffer."
-  (if (or buffer-file-name (derived-mode-p 'dired-mode 'comint-mode))
-      default-directory
-    my/projects-dir))
-
-(defun my/claude (prompt &optional continue)
-  "Run `claude -p PROMPT' and show the answer as rendered Markdown in *claude*.
-With prefix arg CONTINUE, continue the last conversation.  An active
-region is sent to Claude on stdin."
-  (interactive
-   (list (read-string (if current-prefix-arg "Claude (continue): " "Claude: "))
-         current-prefix-arg))
-  (let* ((input (when (use-region-p)
-                  (buffer-substring-no-properties (region-beginning) (region-end))))
-         (dir (my/claude-directory))
-         (default-directory dir)        ; claude process runs here
-         (raw (generate-new-buffer " *claude-raw*"))
-         (view (get-buffer-create "*claude*"))
-         (start (with-current-buffer view
-                  (unless (derived-mode-p 'gfm-view-mode) (gfm-view-mode))
-                  (let ((inhibit-read-only t))
-                    (goto-char (point-max))
-                    (prog1 (point)
-                      (insert "## " prompt "\n\n"
-                              "`" (abbreviate-file-name dir) "`\n\n"
-                              "_Thinking..._\n")))))
-         (proc (make-process
-                :name "claude"
-                :buffer raw
-                :command (append '("claude") (when continue '("-c")) (list "-p" prompt))
-                :connection-type 'pipe
-                :coding 'utf-8
-                :noquery t
-                :sentinel
-                (lambda (p _event)
-                  (unless (process-live-p p)
-                    (let ((answer (with-current-buffer raw (buffer-string))))
-                      (kill-buffer raw)
-                      (with-current-buffer view
-                        (let ((inhibit-read-only t))
-                          (goto-char start)
-                          (when (search-forward "_Thinking..._\n" nil t)
-                            (replace-match ""))
-                          (goto-char (point-max))
-                          (insert answer "\n\n---\n\n")))
-                      (dolist (w (get-buffer-window-list view nil t))
-                        (set-window-point w start)
-                        (set-window-start w start))
-                      (message "Claude finished")))))))
-    (when input (process-send-string proc input))
-    (process-send-eof proc)
-    (display-buffer view)
-    (message "Claude is thinking...")))
-
 ;;; Sensible UI defaults
 
 (setq inhibit-startup-screen t
