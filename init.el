@@ -5,6 +5,14 @@
 (defconst my/windows-p (eq system-type 'windows-nt))
 (defconst my/linux-p   (eq system-type 'gnu/linux))
 
+;; Where projects live: %USERPROFILE%\Projects on Windows ("~" there is %APPDATA%),
+;; ~/Projects on Linux; falls back to the home folder if it doesn't exist.
+(defconst my/projects-dir
+  (let* ((home (if my/windows-p (getenv "USERPROFILE") "~"))
+         (projects (expand-file-name "Projects" home)))
+    (file-name-as-directory
+     (expand-file-name (if (file-directory-p projects) projects home)))))
+
 ;;; Packages
 ;; Packages are not committed (elpa/ is gitignored); each machine installs
 ;; its own on first launch.
@@ -65,7 +73,14 @@
 ;; M-x my/claude        ask; the answer is appended to *claude*, rendered as Markdown
 ;; C-u M-x my/claude    continue the last conversation (claude -c)
 ;; Active region        the selected text is sent to Claude as input (like piping)
-;; Runs in the current buffer's directory, so Claude sees that project.
+;; Runs in the folder of the current file / Dired / shell buffer; from any other
+;; buffer (*scratch*, *Messages*, *claude*, ...) it runs in `my/projects-dir'.
+
+(defun my/claude-directory ()
+  "Folder Claude should run in for the current buffer."
+  (if (or buffer-file-name (derived-mode-p 'dired-mode 'comint-mode))
+      default-directory
+    my/projects-dir))
 
 (defun my/claude (prompt &optional continue)
   "Run `claude -p PROMPT' and show the answer as rendered Markdown in *claude*.
@@ -76,6 +91,8 @@ region is sent to Claude on stdin."
          current-prefix-arg))
   (let* ((input (when (use-region-p)
                   (buffer-substring-no-properties (region-beginning) (region-end))))
+         (dir (my/claude-directory))
+         (default-directory dir)        ; claude process runs here
          (raw (generate-new-buffer " *claude-raw*"))
          (view (get-buffer-create "*claude*"))
          (start (with-current-buffer view
@@ -83,7 +100,9 @@ region is sent to Claude on stdin."
                   (let ((inhibit-read-only t))
                     (goto-char (point-max))
                     (prog1 (point)
-                      (insert "## " prompt "\n\n_Thinking..._\n")))))
+                      (insert "## " prompt "\n\n"
+                              "`" (abbreviate-file-name dir) "`\n\n"
+                              "_Thinking..._\n")))))
          (proc (make-process
                 :name "claude"
                 :buffer raw
@@ -131,12 +150,8 @@ region is sent to Claude on stdin."
 ;;; OS-specific settings
 
 (when my/windows-p
-  ;; "~" is %APPDATA% on Windows, so start in %USERPROFILE%\Projects instead.
-  (let ((projects (expand-file-name "Projects" (getenv "USERPROFILE"))))
-    (setq default-directory (file-name-as-directory
-                             (if (file-directory-p projects)
-                                 projects
-                               (getenv "USERPROFILE")))))
+  ;; Start in the projects folder instead of %APPDATA% ("~").
+  (setq default-directory my/projects-dir)
   (setq w32-use-native-image-API t
         ;; Avoid slow process spawning / stalls with many subprocesses (CIDER, git)
         w32-pipe-read-delay 0
