@@ -45,6 +45,22 @@
   (markdown-fontify-code-blocks-natively t)
   (markdown-header-scaling t))
 
+;;; Tabs, shells and terminals (tmux replacement)
+;; Tabs = tmux windows (C-x t 2 new, C-x t o next, C-x t r rename, C-x t 0 close).
+;; Shells: C-u M-x shell to create named shells (*app-1*, *app-2*, ...).
+
+(tab-bar-mode 1)
+
+;; Shell buffers used for program output / logs
+(setq comint-scroll-to-bottom-on-output 'others  ; auto-scroll unless you're reading it
+      comint-buffer-maximum-size 20000)          ; cap log buffer size
+(add-hook 'comint-output-filter-functions #'comint-truncate-buffer)
+
+;; Full terminal emulator for TUI apps (Claude Code). Not supported on native Windows.
+;; Copy mode: C-c C-e (Emacs mode) -> select, M-w -> C-c C-j back to terminal.
+(when my/linux-p
+  (use-package eat))
+
 ;;; Sensible UI defaults
 
 (setq inhibit-startup-screen t
