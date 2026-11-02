@@ -53,6 +53,13 @@
   (markdown-fontify-code-blocks-natively t)
   (markdown-header-scaling t))
 
+;;; Git
+;; C-x g = status buffer (s stage, u unstage, c c commit, P p push, F p pull,
+;; b b branch, l l log, z z stash, ? help). C-c C-c finishes a commit message.
+
+(use-package magit
+  :bind ("C-x g" . magit-status))
+
 ;;; Tabs, shells and terminals (tmux replacement)
 ;; Tabs = tmux windows (C-x t 2 new, C-x t o next, C-x t r rename, C-x t 0 close).
 ;; Shells: C-u M-x shell to create named shells (*app-1*, *app-2*, ...).
@@ -64,10 +71,10 @@
       comint-buffer-maximum-size 20000)          ; cap log buffer size
 (add-hook 'comint-output-filter-functions #'comint-truncate-buffer)
 
-;; Full terminal emulator for TUI apps (Claude Code). Not supported on native Windows.
-;; Copy mode: C-c C-e (Emacs mode) -> select, M-w -> C-c C-j back to terminal.
-(when my/linux-p
-  (use-package eat))
+;; Full terminal emulator for TUI apps (Claude Code), powered by libghostty-vt.
+;; M-x ghostel; on first use it offers to download a prebuilt native module.
+;; Copy mode: C-c C-t (freeze output) or C-c C-e (Emacs mode) -> select, M-w -> C-c C-j back to terminal.
+(use-package ghostel)
 
 ;;; Sensible UI defaults
 
