@@ -19,10 +19,29 @@
 
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+
+;; Git for Windows' MSYS gpg can't read "C:/..." paths, so GNU ELPA signature
+;; checks fail ("Failed to download `gnu' archive"). Give it a "/c/..." path.
+(when (and my/windows-p
+           (string-match-p "/usr/bin/" (or (executable-find "gpg") "")))
+  (setq package-gnupghome-dir
+        (replace-regexp-in-string
+         "\\`\\([A-Za-z]\\):"
+         (lambda (m) (concat "/" (downcase (match-string 1 m))))
+         (expand-file-name "elpa/gnupg" user-emacs-directory))))
+
 (package-initialize)
 
 (unless package-archive-contents
   (package-refresh-contents))
+
+;; The cached archive list goes stale and MELPA deletes old builds, so a new
+;; package can fail with "Not found". On failure, refresh once and retry.
+(define-advice package-install (:around (orig pkg &rest args) refresh-on-fail)
+  (condition-case nil
+      (apply orig pkg args)
+    (error (package-refresh-contents)
+           (apply orig pkg args))))
 
 ;; Built-in use-package (Emacs 29+) doesn't load :ensure support by default.
 (require 'use-package-ensure)
