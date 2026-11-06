@@ -105,6 +105,27 @@
 (put 'upcase-region 'disabled nil)
 (put 'dired-find-alternate-file 'disabled nil)
 
+;;; Active window indicator (mode line contrast)
+;; The selected window gets a bright, bold mode line; the others fade out.
+;; Re-applied after every theme change because themes reset face settings.
+
+(defun my/apply-mode-line-contrast (&rest _)
+  "Make `mode-line-active' stand out against `mode-line-inactive'."
+  (let ((dark (eq (frame-parameter nil 'background-mode) 'dark)))
+    (set-face-attribute 'mode-line-active nil
+                        :background (if dark "#1f6feb" "#0b5fc4")
+                        :foreground "#ffffff"
+                        :weight 'bold
+                        :box nil)
+    (set-face-attribute 'mode-line-inactive nil
+                        :background (if dark "#2a2a2a" "#e4e4e4")
+                        :foreground (if dark "#777777" "#8a8a8a")
+                        :weight 'normal
+                        :box nil)))
+
+(my/apply-mode-line-contrast)
+(add-hook 'enable-theme-functions #'my/apply-mode-line-contrast)
+
 ;;; Cross-platform file handling
 ;; LF everywhere so files stay clean in git; still read CRLF files fine.
 
