@@ -104,6 +104,75 @@
 (show-paren-mode 1)
 (global-display-line-numbers-mode 1) ; line numbers in every buffer
 (tool-bar-mode -1)                   ; always hide the tool bar
+;; Reload buffers when their file is changed on disk by another program
+;; (e.g. Claude Code). Buffers with unsaved edits are never reverted.
+(setq global-auto-revert-non-file-buffers t  ; also refresh Dired
+      auto-revert-verbose nil)               ; no "Reverted buffer" message
+(global-auto-revert-mode 1)
+
+;; ediff-current-file may ask "Compare with auto-save file?"; the auto-save
+;; file holds our own unsaved edits, so both sides look identical. Always
+;; compare against the real file on disk instead.
+(defvar my/ediff-saved-wincfg nil
+  "Window layout from before `ediff-current-file', restored when Ediff quits.")
+
+(defun my/ediff-restore-after-quit ()
+  "After quitting Ediff: restore the previous layout, drop the FILE= buffer."
+  (when my/ediff-saved-wincfg
+    (set-window-configuration my/ediff-saved-wincfg)
+    (setq my/ediff-saved-wincfg nil)
+    (dolist (b (buffer-list))
+      (when (string-prefix-p "FILE=" (buffer-name b))
+        (kill-buffer b)))))
+;; depth 90: run after ediff-cleanup-mess has killed the control buffer
+(add-hook 'ediff-quit-hook #'my/ediff-restore-after-quit 90)
+
+(defun my/ediff-current-file-vs-disk (orig-fn &rest args)
+  (setq my/ediff-saved-wincfg (current-window-configuration))
+  (cl-letf* ((orig-y-or-n-p (symbol-function 'y-or-n-p))
+             ((symbol-function 'y-or-n-p)
+              (lambda (prompt)
+                (unless (string-match-p "auto-save" prompt)
+                  (funcall orig-y-or-n-p prompt)))))
+    (apply orig-fn args)))
+(advice-add 'ediff-current-file :around #'my/ediff-current-file-vs-disk)
+
+;; When saving a buffer whose file also changed on disk, Emacs asks
+;; "...changed on disk; really edit the buffer?". Answering n aborts the
+;; save (as before) and now also opens Ediff: buffer vs. disk version.
+(defun my/ediff-on-supersession (orig-fn filename)
+  (condition-case err
+      (funcall orig-fn filename)
+    (file-supersession
+     ;; Only for the "n" answer; "r" (revert) signals "File reverted".
+     (when (equal (cadr err) "File changed on disk")
+       (let ((buf (current-buffer)))
+         (run-at-time 0 nil
+                      (lambda ()
+                        (when (buffer-live-p buf)
+                          (with-current-buffer buf (ediff-current-file)))))))
+     (signal (car err) (cdr err)))))
+(advice-add 'ask-user-about-supersession-threat
+            :around #'my/ediff-on-supersession)
+
+;; Same idea for C-x C-s: "FILE has changed since visited or saved.  Save
+;; anyway?" -> answering no ("Save not confirmed") now opens Ediff too.
+(defun my/ediff-on-save-refused (orig-fn &rest args)
+  (let ((buf (current-buffer))
+        (changed (and buffer-file-name
+                      (buffer-modified-p)
+                      (file-exists-p buffer-file-name)
+                      (not (verify-visited-file-modtime (current-buffer))))))
+    (condition-case err
+        (apply orig-fn args)
+      (user-error
+       (when (and changed (equal (cadr err) "Save not confirmed"))
+         (run-at-time 0 nil
+                      (lambda ()
+                        (when (buffer-live-p buf)
+                          (with-current-buffer buf (ediff-current-file))))))
+       (signal (car err) (cdr err))))))
+(advice-add 'basic-save-buffer :around #'my/ediff-on-save-refused)
 (put 'upcase-region 'disabled nil)
 (put 'dired-find-alternate-file 'disabled nil)
 
