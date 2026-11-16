@@ -103,6 +103,7 @@
 (when (file-exists-p custom-file) (load custom-file))
 (show-paren-mode 1)
 (global-display-line-numbers-mode 1) ; line numbers in every buffer
+(tool-bar-mode -1)                   ; always hide the tool bar
 (put 'upcase-region 'disabled nil)
 (put 'dired-find-alternate-file 'disabled nil)
 
