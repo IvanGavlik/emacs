@@ -14,6 +14,9 @@ history
 savehist
 places
 bookmarks
+desktop/
+.emacs.desktop
+.emacs.desktop.lock
 network-security.data
 *.elc
 *~

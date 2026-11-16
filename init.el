@@ -197,6 +197,95 @@
 (my/apply-mode-line-contrast)
 (add-hook 'enable-theme-functions #'my/apply-mode-line-contrast)
 
+;;; Session restore (desktop-save-mode)
+;; On exit, saves open files (with cursor positions), Dired buffers, tabs and
+;; window layout; restores them on the next start. Autosaves every 30s too, so
+;; a crash or Windows shutdown loses little. Shells, terminals and Magit buffers
+;; are not restored. Stored per machine in desktop/ (gitignored).
+;; M-x desktop-save = save now, M-x desktop-clear = close everything,
+;; M-x desktop-remove = forget the session (next start is fresh).
+
+(defconst my/desktop-dir
+  (file-name-as-directory (expand-file-name "desktop" user-emacs-directory)))
+(make-directory my/desktop-dir t)
+
+(setq desktop-dirname             my/desktop-dir
+      desktop-path                (list my/desktop-dir)
+      desktop-save                t           ; save on exit without asking
+      desktop-auto-save-timeout   30          ; seconds of idle between autosaves
+      ;; After a crash the lock file stays behind; load anyway if the Emacs that
+      ;; owned it is no longer running, ask only if it still is (a 2nd instance).
+      desktop-load-locked-desktop 'check-pid
+      ;; Create every buffer at startup (not lazily), so the windows in each
+      ;; restored tab find their buffers (shells included) instead of *scratch*.
+      desktop-restore-eager       t
+      ;; Restore frames/tabs, but pull them back on screen if a monitor is gone.
+      desktop-restore-frames      t
+      desktop-restore-in-current-display t
+      desktop-restore-forces-onscreen    t)
+
+;; Shell buffers (M-x shell) have no file, so desktop skips them by default.
+;; Save each shell's name and current directory; on restore start a fresh
+;; shell with the same name in that directory (output/processes are not kept).
+(defun my/desktop-shell-misc (_desktop-dirname)
+  "Data desktop stores for a shell buffer: its current directory."
+  default-directory)
+
+(defun my/desktop-shell-enable ()
+  (setq-local desktop-save-buffer #'my/desktop-shell-misc))
+(add-hook 'shell-mode-hook #'my/desktop-shell-enable)
+
+;; Exact directory tracking for M-x shell. By default Emacs guesses the
+;; directory from the `cd' commands you type, which breaks on Git Bash paths
+;; (/c/Users -> c:/c/Users), `cd -', pushd, aliases and scripts. Instead bash
+;; reports its real directory after every command with an OSC 7 escape
+;; sequence (via PROMPT_COMMAND), which Emacs reads into `default-directory'.
+;; Git Bash: `pwd -W' gives C:/...; Linux: plain $PWD.
+(defconst my/shell-osc7-prompt-command
+  (concat "__emacs_d=$(pwd -W 2>/dev/null) && __emacs_d=/$__emacs_d"
+          " || __emacs_d=$PWD;"
+          " printf '\\e]7;file://%s%s\\e\\\\' \"$HOSTNAME\" \"$__emacs_d\""))
+
+(define-advice shell (:around (orig &rest args) osc7-cwd)
+  "Start shells with PROMPT_COMMAND reporting the directory via OSC 7."
+  (let ((process-environment
+         (cons (concat "PROMPT_COMMAND=" my/shell-osc7-prompt-command)
+               process-environment)))
+    (apply orig args)))
+
+(defun my/shell-osc7-cwd (_ text)
+  "Set `default-directory' from an OSC 7 file://HOST/PATH TEXT."
+  (when (and (not (file-remote-p default-directory))
+             (string-match "\\`file://[^/]*\\(/.*\\)\\'" text))
+    (let ((dir (match-string 1 text)))
+      (when (string-match-p "\\`/[A-Za-z]:/" dir) ; /C:/x -> C:/x (Windows)
+        (setq dir (substring dir 1)))
+      (when (file-directory-p dir)
+        ;; Exact tracking works; stop guessing from typed `cd' commands.
+        (when (bound-and-true-p shell-dirtrack-mode) (shell-dirtrack-mode -1))
+        (cd-absolute dir)))))
+
+(defun my/shell-osc7-enable ()
+  (require 'ansi-osc)
+  (setq-local ansi-osc-handlers
+              (cons '("7" . my/shell-osc7-cwd)
+                    (assoc-delete-all "7" (copy-sequence ansi-osc-handlers))))
+  (add-hook 'comint-output-filter-functions #'comint-osc-process-output nil t))
+(add-hook 'shell-mode-hook #'my/shell-osc7-enable)
+
+(defun my/desktop-shell-restore (_file-name buffer-name misc)
+  "Recreate a saved shell buffer BUFFER-NAME in directory MISC."
+  (let ((default-directory (if (and (stringp misc) (file-directory-p misc))
+                               misc
+                             my/projects-dir)))
+    (save-window-excursion (shell buffer-name))))
+
+(with-eval-after-load 'desktop
+  (add-to-list 'desktop-buffer-mode-handlers
+               '(shell-mode . my/desktop-shell-restore)))
+
+(desktop-save-mode 1)
+
 ;;; Cross-platform file handling
 ;; LF everywhere so files stay clean in git; still read CRLF files fine.
 
