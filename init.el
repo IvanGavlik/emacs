@@ -68,7 +68,14 @@
 ;; Jump to definition (M-. / M-,) without a REPL, via clojure-lsp.
 ;; With a CIDER REPL connected, CIDER's xref backend takes over.
 (use-package eglot
-  :hook ((clojure-mode clojurescript-mode clojurec-mode) . eglot-ensure))
+  :hook ((clojure-mode clojurescript-mode clojurec-mode) . eglot-ensure)
+  :custom
+  ;; clojure-lsp's first startup on a big project (utwig) takes minutes;
+  ;; the 30s default makes eglot give up with "timeout".
+  (eglot-connect-timeout 600)
+  ;; Keep clojure-mode's own colors: don't let clojure-lsp recolor the buffer
+  ;; with semantic tokens.
+  (eglot-ignored-server-capabilities '(:semanticTokensProvider)))
 
 (use-package markdown-mode
   :mode ("\\.md\\'" "\\.markdown\\'")
