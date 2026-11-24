@@ -65,6 +65,11 @@
   (cider-save-file-on-load t)
   (cider-show-error-buffer 'only-in-repl))
 
+;; Jump to definition (M-. / M-,) without a REPL, via clojure-lsp.
+;; With a CIDER REPL connected, CIDER's xref backend takes over.
+(use-package eglot
+  :hook ((clojure-mode clojurescript-mode clojurec-mode) . eglot-ensure))
+
 (use-package markdown-mode
   :mode ("\\.md\\'" "\\.markdown\\'")
   :hook (markdown-mode . visual-line-mode)
