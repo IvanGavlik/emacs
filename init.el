@@ -92,8 +92,17 @@
 
 ;; Full terminal emulator for TUI apps (Claude Code), powered by libghostty-vt.
 ;; M-x ghostel; on first use it offers to download a prebuilt native module.
-;; Copy mode: C-c C-t (freeze output) or C-c C-e (Emacs mode) -> select, M-w -> C-c C-j back to terminal.
-(use-package ghostel)
+;; Copy mode: C-c C-t (freeze output) or C-c C-e (Emacs mode) -> select, M-w copies and STAYS in
+;; copy mode (C-w still copies and exits to the terminal); C-c C-j goes back to the terminal.
+(use-package ghostel
+  :config
+  (defun my/ghostel-copy-stay ()
+    "Copy the region (soft wraps removed) and stay in copy mode, without moving point."
+    (interactive)
+    (when (use-region-p)
+      (kill-ring-save (region-beginning) (region-end))
+      (deactivate-mark)))
+  (define-key ghostel-readonly-mode-map (kbd "M-w") #'my/ghostel-copy-stay))
 
 ;;; Sensible UI defaults
 
